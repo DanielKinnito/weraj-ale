@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { submitRoute } from '@/app/actions'
 
 interface AddRouteFormProps {
     onClose: () => void
@@ -33,26 +33,18 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
         setLoading(true)
 
         try {
-            const { error } = await supabase.from('routes').insert({
-                user_id: user.id,
-                start_name: formData.start_name,
-                start_lat: formData.start_lat,
-                start_lng: formData.start_lng,
-                end_name: formData.end_name,
-                end_lat: formData.end_lat,
-                end_lng: formData.end_lng,
-                price: parseFloat(formData.price),
-                vehicle_type: formData.vehicle_type,
-                is_verified: false
-            })
+            const result = await submitRoute(formData, user.id)
 
-            if (error) throw error
+            if (!result.success) {
+                throw new Error(result.message)
+            }
 
-            alert('Route submitted successfully!')
+            alert(result.message)
             onSuccess()
         } catch (error) {
             console.error('Error submitting route:', error)
-            alert('Failed to submit route. Please try again.')
+            const message = error instanceof Error ? error.message : 'Failed to submit route. Please try again.'
+            alert(message)
         } finally {
             setLoading(false)
         }

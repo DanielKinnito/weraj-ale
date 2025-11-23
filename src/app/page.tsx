@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Map from '@/components/Map'
 import AddRouteForm from '@/components/AddRouteForm'
-import { Plus, LogIn, LogOut, User as UserIcon, MapPin, Car, Bus, Bike } from 'lucide-react'
+import ReviewForm from '@/components/ReviewForm'
+import { Plus, LogIn, LogOut, User as UserIcon, MapPin, Car, Bus, Bike, Star } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +12,7 @@ import { Route } from '@/lib/types'
 
 export default function Home() {
   const [showAddRoute, setShowAddRoute] = useState(false)
+  const [reviewRouteId, setReviewRouteId] = useState<string | null>(null)
   const { user, signInWithGoogle, signOut } = useAuth()
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +42,15 @@ export default function Home() {
       case 'bus': return <Bus size={16} />
       case 'bajaj': return <Bike size={16} />
       default: return <Car size={16} />
+    }
+  }
+
+  const handleRateClick = (e: React.MouseEvent, routeId: string) => {
+    e.stopPropagation()
+    if (!user) {
+      signInWithGoogle()
+    } else {
+      setReviewRouteId(routeId)
     }
   }
 
@@ -90,15 +101,24 @@ export default function Home() {
             </div>
           ) : (
             routes.map(route => (
-              <div key={route.id} className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-primary transition-colors cursor-pointer bg-white dark:bg-slate-800 shadow-sm">
+              <div key={route.id} className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-primary transition-colors cursor-pointer bg-white dark:bg-slate-800 shadow-sm group">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2 text-primary font-medium">
                     {getVehicleIcon(route.vehicle_type)}
                     <span className="capitalize">{route.vehicle_type}</span>
                   </div>
-                  <span className="text-sm font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-700 dark:text-slate-300">
-                    {route.price} ETB
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => handleRateClick(e, route.id)}
+                      className="text-slate-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Rate this route"
+                    >
+                      <Star size={16} />
+                    </button>
+                    <span className="text-sm font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-700 dark:text-slate-300">
+                      {route.price} ETB
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1 relative pl-4 border-l-2 border-slate-200 dark:border-slate-700 ml-1">
@@ -117,10 +137,12 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex-1 h-full z-0">
-        <Map />
+      {/* Map Component */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        {/* <Map routes={routes} /> */}
       </div>
 
+      {/* Add Route Button */}
       <button
         className="absolute bottom-8 right-8 z-[1000] bg-primary hover:bg-primary-hover text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-colors"
         aria-label="Add Route"
@@ -135,15 +157,22 @@ export default function Home() {
         <Plus size={24} />
       </button>
 
-      {showAddRoute && (
-        <AddRouteForm
-          onClose={() => setShowAddRoute(false)}
+      {/* {showAddRoute && (
+        <AddRouteForm 
+          onClose={() => setShowAddRoute(false)} 
           onSuccess={() => {
             fetchRoutes()
             setShowAddRoute(false)
           }}
         />
-      )}
+      )} */}
+
+      {/* {reviewRouteId && (
+        <ReviewForm
+          routeId={reviewRouteId}
+          onClose={() => setReviewRouteId(null)}
+        />
+      )} */}
     </main>
   )
 }

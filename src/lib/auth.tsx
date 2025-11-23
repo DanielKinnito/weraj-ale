@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { createClient } from '@/utils/supabase/client'
 
 type AuthContextType = {
     user: User | null
@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
+    const supabase = createClient()
 
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -35,11 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         )
 
         return () => subscription.unsubscribe()
-    }, [])
+    }, [supabase])
 
     const signInWithGoogle = async () => {
         await supabase.auth.signInWithOAuth({
             provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+            },
         })
     }
 
