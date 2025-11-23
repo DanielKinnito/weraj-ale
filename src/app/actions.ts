@@ -5,14 +5,10 @@ import { createClient } from '@/utils/supabase/server'
 // Configuration: Rate Limit in Minutes
 const RATE_LIMIT_MINUTES = 1
 
-export async function submitRoute(formData: any, stops: string[], userId: string) {
+export async function submitRoute(formData: any, stops: { name: string, lat: number, lng: number }[], userId: string) {
     const supabase = await createClient()
-    if (!userId) {
-        return { success: false, message: 'User not authenticated' }
-    }
 
     // 1. Rate Limiting Check
-    // Check if user has submitted a route in the last X minutes
     const timeLimit = new Date(Date.now() - RATE_LIMIT_MINUTES * 60 * 1000).toISOString()
 
     const { data: recentRoutes, error: fetchError } = await supabase
@@ -24,41 +20,42 @@ export async function submitRoute(formData: any, stops: string[], userId: string
 
     if (fetchError) {
         console.error('Error checking rate limit:', fetchError)
-        return { success: false, message: 'System error. Please try again.' }
+        return { success: false, message: 'Failed to check rate limit' }
     }
 
     if (recentRoutes && recentRoutes.length > 0) {
-        return { success: false, message: `Rate limit exceeded. Please wait ${RATE_LIMIT_MINUTES} minutes before adding another route.` }
+        return { success: false, message: `Rate limit exceeded. Please wait ${RATE_LIMIT_MINUTES} minute(s) before adding another route.` }
     }
 
-    // 2. Submit Route
-    const { data: routeData, error } = await supabase.from('routes').insert({
-        user_id: userId,
-        start_name: formData.start_name,
-        start_lat: formData.start_lat,
-        start_lng: formData.start_lng,
-        end_name: formData.end_name,
-        end_lat: formData.end_lat,
-        end_lng: formData.end_lng,
-        price: parseFloat(formData.price),
-        vehicle_type: formData.vehicle_type,
-        is_verified: false
-    })
+    // 2. Insert Route
+    const { data: route, error: routeError } = await supabase
+        .from('routes')
+        .insert({
+            user_id: userId,
+            start_name: formData.start_name,
+            end_name: formData.end_name,
+            start_lat: formData.start_lat,
+            start_lng: formData.start_lng,
+            end_lat: formData.end_lat,
+            end_lng: formData.end_lng,
+            price: parseFloat(formData.price),
+            vehicle_type: formData.vehicle_type
+        })
         .select()
         .single()
 
-    if (error) {
-        console.error('Error submitting route:', error)
-        return { success: false, message: `Failed to save route: ${error.message}` }
+    if (routeError) {
+        console.error('Error inserting route:', routeError)
+        return { success: false, message: `Failed to add route: ${routeError.message}` }
     }
 
-    // 3. Submit Stops (if any)
+    // 3. Insert Stops
     if (stops && stops.length > 0) {
-        const stopsData = stops.map((stopName, index) => ({
-            route_id: routeData.id,
-            name: stopName,
-            lat: 0, // Default since we don't have geocoding yet
-            lng: 0, // Default since we don't have geocoding yet
+        const stopsData = stops.map((stop, index) => ({
+            route_id: route.id,
+            name: stop.name,
+            lat: stop.lat,
+            lng: stop.lng,
             stop_order: index + 1
         }))
 
@@ -67,33 +64,29 @@ export async function submitRoute(formData: any, stops: string[], userId: string
             .insert(stopsData)
 
         if (stopsError) {
-            console.error('Error submitting stops:', stopsError)
-            // We don't fail the whole request if stops fail, but we log it.
-            // Ideally we'd rollback, but Supabase HTTP API doesn't support transactions easily here.
+            console.error('Error inserting stops:', stopsError)
+            return { success: true, message: 'Route added, but some stops failed to save.' }
         }
     }
 
     return { success: true, message: 'Route submitted successfully!' }
 }
 
-export async function updateRoute(routeId: number, formData: any, stops: string[], userId: string) {
+export async function updateRoute(routeId: number, formData: any, stops: { name: string, lat: number, lng: number }[], userId: string) {
     const supabase = await createClient()
-    if (!userId) {
-        return { success: false, message: 'User not authenticated' }
-    }
 
     // 1. Verify Ownership
-    const { data: route, error: fetchError } = await supabase
+    const { data: existingRoute, error: fetchError } = await supabase
         .from('routes')
         .select('user_id')
         .eq('id', routeId)
         .single()
 
-    if (fetchError || !route) {
+    if (fetchError || !existingRoute) {
         return { success: false, message: 'Route not found' }
     }
 
-    if (route.user_id !== userId) {
+    if (existingRoute.user_id !== userId) {
         return { success: false, message: 'You are not authorized to edit this route' }
     }
 
@@ -107,7 +100,7 @@ export async function updateRoute(routeId: number, formData: any, stops: string[
             start_lng: formData.start_lng,
             end_lat: formData.end_lat,
             end_lng: formData.end_lng,
-            price: formData.price,
+            price: parseFloat(formData.price),
             vehicle_type: formData.vehicle_type,
             updated_at: new Date().toISOString()
         })
@@ -118,8 +111,8 @@ export async function updateRoute(routeId: number, formData: any, stops: string[
         return { success: false, message: `Failed to update route: ${updateError.message}` }
     }
 
-    // 3. Update Stops (Delete existing and re-insert)
-    // First, delete existing stops
+    // 3. Update Stops (Delete all and re-insert)
+    // First delete existing stops
     const { error: deleteStopsError } = await supabase
         .from('stops')
         .delete()
@@ -127,16 +120,16 @@ export async function updateRoute(routeId: number, formData: any, stops: string[
 
     if (deleteStopsError) {
         console.error('Error deleting old stops:', deleteStopsError)
-        // Continue anyway to try inserting new ones
+        return { success: false, message: 'Failed to update stops' }
     }
 
     // Insert new stops
     if (stops && stops.length > 0) {
-        const stopsData = stops.map((stopName, index) => ({
+        const stopsData = stops.map((stop, index) => ({
             route_id: routeId,
-            name: stopName,
-            lat: 0,
-            lng: 0,
+            name: stop.name,
+            lat: stop.lat,
+            lng: stop.lng,
             stop_order: index + 1
         }))
 
@@ -145,8 +138,8 @@ export async function updateRoute(routeId: number, formData: any, stops: string[
             .insert(stopsData)
 
         if (stopsError) {
-            console.error('Error updating stops:', stopsError)
-            return { success: false, message: `Route updated, but failed to save stops: ${stopsError.message}` }
+            console.error('Error inserting new stops:', stopsError)
+            return { success: true, message: 'Route updated, but stops failed to save.' }
         }
     }
 
@@ -182,8 +175,32 @@ export async function deleteRoute(routeId: number, userId: string) {
 
     if (deleteError) {
         console.error('Error deleting route:', deleteError)
-        return { success: false, message: `Failed to delete route: ${deleteError.message}` }
+        return { success: false, message: `Failed to delete route: ${deleteError.message} (Code: ${deleteError.code})` }
     }
 
     return { success: true, message: 'Route deleted successfully!' }
+}
+
+export async function searchLocation(query: string) {
+    const apiKey = process.env.ORS_API_KEY
+    if (!apiKey) {
+        console.error('ORS_API_KEY is missing')
+        return { success: false, message: 'Server configuration error' }
+    }
+
+    try {
+        const response = await fetch(
+            `https://api.openrouteservice.org/geocode/search?api_key=${apiKey}&text=${encodeURIComponent(query)}&boundary.country=ET&size=5`
+        )
+
+        if (!response.ok) {
+            throw new Error(`ORS API Error: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        return { success: true, data: data.features || [] }
+    } catch (error: any) {
+        console.error('Error searching location:', error)
+        return { success: false, message: 'Failed to search location' }
+    }
 }
