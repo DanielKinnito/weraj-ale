@@ -13,6 +13,8 @@ export type Route = {
     is_verified: boolean
     created_at: string
     updated_at?: string
+    avg_rating?: number
+    rating_count?: number
 }
 
 export type Stop = {
