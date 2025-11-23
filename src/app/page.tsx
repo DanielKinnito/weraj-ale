@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import Map from '@/components/Map'
 import AddRouteForm from '@/components/AddRouteForm'
 import ReviewForm from '@/components/ReviewForm'
-import { Plus, LogIn, LogOut, User as UserIcon, MapPin, Car, Bus, Bike, Star, Menu, X, ChevronLeft, ChevronRight, Sun, Moon, Edit } from 'lucide-react'
+import { Plus, LogIn, LogOut, User as UserIcon, MapPin, Car, Bus, Bike, Star, Menu, X, ChevronLeft, ChevronRight, Sun, Moon, Edit, Trash2, BusFront } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { Route } from '@/lib/types'
+import { deleteRoute } from '@/app/actions'
 
 export default function Home() {
   const [showAddRoute, setShowAddRoute] = useState(false)
@@ -74,6 +75,29 @@ export default function Home() {
     setShowAddRoute(true)
   }
 
+  const handleDeleteClick = async (e: React.MouseEvent, routeId: number) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this route? This action cannot be undone.')) return
+
+    if (!user) return
+
+    try {
+      const result = await deleteRoute(routeId, user.id)
+      if (result.success) {
+        alert(result.message)
+        fetchRoutes()
+        if (selectedRoute?.id === routeId) {
+          setSelectedRoute(null)
+        }
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      console.error('Error deleting route:', error)
+      alert('Failed to delete route')
+    }
+  }
+
   const handleRouteClick = (route: Route) => {
     setSelectedRoute(route)
     // On mobile, close sidebar when route is clicked to see map
@@ -107,7 +131,10 @@ export default function Home() {
       )}>
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-primary mb-1">Weraj Ale</h1>
+            <h1 className="text-2xl font-bold text-primary mb-1 flex items-center gap-2">
+              <BusFront size={28} />
+              Weraj Ale
+            </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">Find and share public transport routes.</p>
           </div>
 
@@ -176,13 +203,22 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     {user && user.id === route.user_id && (
-                      <button
-                        onClick={(e) => handleEditClick(e, route)}
-                        className="text-slate-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
-                        title="Edit this route"
-                      >
-                        <Edit size={16} />
-                      </button>
+                      <>
+                        <button
+                          onClick={(e) => handleEditClick(e, route)}
+                          className="text-slate-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
+                          title="Edit this route"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteClick(e, route.id)}
+                          className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
+                          title="Delete this route"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={(e) => handleRateClick(e, route.id)}

@@ -152,3 +152,38 @@ export async function updateRoute(routeId: number, formData: any, stops: string[
 
     return { success: true, message: 'Route updated successfully!' }
 }
+
+export async function deleteRoute(routeId: number, userId: string) {
+    const supabase = await createClient()
+    if (!userId) {
+        return { success: false, message: 'User not authenticated' }
+    }
+
+    // 1. Verify Ownership
+    const { data: route, error: fetchError } = await supabase
+        .from('routes')
+        .select('user_id')
+        .eq('id', routeId)
+        .single()
+
+    if (fetchError || !route) {
+        return { success: false, message: 'Route not found' }
+    }
+
+    if (route.user_id !== userId) {
+        return { success: false, message: 'You are not authorized to delete this route' }
+    }
+
+    // 2. Delete Route (Cascade will handle stops)
+    const { error: deleteError } = await supabase
+        .from('routes')
+        .delete()
+        .eq('id', routeId)
+
+    if (deleteError) {
+        console.error('Error deleting route:', deleteError)
+        return { success: false, message: `Failed to delete route: ${deleteError.message}` }
+    }
+
+    return { success: true, message: 'Route deleted successfully!' }
+}

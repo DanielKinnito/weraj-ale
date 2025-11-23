@@ -1,25 +1,28 @@
 'use client'
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import { useEffect, useState } from 'react'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
 import { Route } from '@/lib/types'
+import { useEffect, useState } from 'react'
+import RoutePolyline from './RoutePolyline'
 
-// Component to handle flying to a selected route
-function FlyToRoute({ selectedRoute }: { selectedRoute: Route | null }) {
-    const map = useMap()
+// Fix for default marker icons in Next.js
+const iconRetinaUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png'
+const iconUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png'
+const shadowUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 
-    useEffect(() => {
-        if (selectedRoute) {
-            map.flyTo([selectedRoute.start_lat, selectedRoute.start_lng], 15, {
-                duration: 1.5
-            })
-        }
-    }, [selectedRoute, map])
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl,
+    iconUrl,
+    shadowUrl,
+})
 
-    return null
+interface MapInnerProps {
+    routes: Route[]
+    selectedRoute?: Route | null
 }
 
-// Component to invalidate map size on mount/resize to fix tile rendering
 function MapInvalidator() {
     const map = useMap()
     useEffect(() => {
@@ -28,35 +31,30 @@ function MapInvalidator() {
     return null
 }
 
-export default function MapInner({ routes = [], selectedRoute }: { routes?: Route[], selectedRoute?: Route | null }) {
-    const [isMounted, setIsMounted] = useState(false)
+function FlyToRoute({ selectedRoute }: { selectedRoute: Route | null }) {
+    const map = useMap()
 
     useEffect(() => {
-        setIsMounted(true)
-
-        // Fix for default marker icons in Next.js
-        import('leaflet').then((L) => {
-            // @ts-ignore
-            delete L.Icon.Default.prototype._getIconUrl
-            L.Icon.Default.mergeOptions({
-                iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+        if (selectedRoute) {
+            map.flyTo([selectedRoute.start_lat, selectedRoute.start_lng], 15, {
+                animate: true,
+                duration: 1.5
             })
-        })
-    }, [])
+        }
+    }, [selectedRoute, map])
 
-    if (!isMounted) {
-        return <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-900">Loading map...</div>
-    }
+    return null
+}
 
-    // Addis Ababa coordinates
-    const position: [number, number] = [9.0192, 38.7525]
+export default function MapInner({ routes, selectedRoute }: MapInnerProps) {
+    const position: [number, number] = [9.0192, 38.7525] // Addis Ababa
 
     return (
         <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%' }}>
             <MapInvalidator />
             <FlyToRoute selectedRoute={selectedRoute || null} />
+            {selectedRoute && <RoutePolyline route={selectedRoute} />}
+
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
