@@ -9,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-export async function submitRoute(formData: any, userId: string) {
+export async function submitRoute(formData: any, stops: string[], userId: string) {
     if (!userId) {
         return { success: false, message: 'User not authenticated' }
     }
@@ -35,7 +35,7 @@ export async function submitRoute(formData: any, userId: string) {
     }
 
     // 2. Submit Route
-    const { error } = await supabase.from('routes').insert({
+    const { data: routeData, error } = await supabase.from('routes').insert({
         user_id: userId,
         start_name: formData.start_name,
         start_lat: formData.start_lat,
@@ -47,10 +47,33 @@ export async function submitRoute(formData: any, userId: string) {
         vehicle_type: formData.vehicle_type,
         is_verified: false
     })
+        .select()
+        .single()
 
     if (error) {
         console.error('Error submitting route:', error)
         return { success: false, message: 'Failed to save route.' }
+    }
+
+    // 3. Submit Stops (if any)
+    if (stops && stops.length > 0) {
+        const stopsData = stops.map((stopName, index) => ({
+            route_id: routeData.id,
+            name: stopName,
+            lat: 0, // Default since we don't have geocoding yet
+            lng: 0, // Default since we don't have geocoding yet
+            stop_order: index + 1
+        }))
+
+        const { error: stopsError } = await supabase
+            .from('stops')
+            .insert(stopsData)
+
+        if (stopsError) {
+            console.error('Error submitting stops:', stopsError)
+            // We don't fail the whole request if stops fail, but we log it.
+            // Ideally we'd rollback, but Supabase HTTP API doesn't support transactions easily here.
+        }
     }
 
     return { success: true, message: 'Route submitted successfully!' }

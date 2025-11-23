@@ -26,6 +26,23 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
         end_lng: 38.7525,
     })
 
+    const [stops, setStops] = useState<string[]>([''])
+
+    const handleAddStop = () => {
+        setStops([...stops, ''])
+    }
+
+    const handleRemoveStop = (index: number) => {
+        const newStops = stops.filter((_, i) => i !== index)
+        setStops(newStops)
+    }
+
+    const handleStopChange = (index: number, value: string) => {
+        const newStops = [...stops]
+        newStops[index] = value
+        setStops(newStops)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!user) return
@@ -33,7 +50,10 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
         setLoading(true)
 
         try {
-            const result = await submitRoute(formData, user.id)
+            // Filter out empty stops
+            const validStops = stops.filter(stop => stop.trim() !== '')
+
+            const result = await submitRoute(formData, validStops, user.id)
 
             if (!result.success) {
                 throw new Error(result.message)
@@ -52,7 +72,7 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] backdrop-blur-[4px]">
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl w-[90%] max-w-[500px] shadow-xl animate-in fade-in zoom-in duration-300">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl w-[90%] max-w-[500px] shadow-xl animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold">Add New Route</h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
@@ -71,6 +91,39 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
                             onChange={e => setFormData({ ...formData, start_name: e.target.value })}
                             className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                         />
+                    </div>
+
+                    {/* Intermediate Stops */}
+                    <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Intermediate Stops (Optional)</label>
+                        {stops.map((stop, index) => (
+                            <div key={index} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder={`Stop ${index + 1}`}
+                                    value={stop}
+                                    onChange={e => handleStopChange(index, e.target.value)}
+                                    className="flex-1 p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                />
+                                {stops.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveStop(index)}
+                                        className="text-red-500 hover:text-red-700 p-2"
+                                        title="Remove stop"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={handleAddStop}
+                            className="text-sm text-primary hover:text-primary-hover font-medium self-start"
+                        >
+                            + Add Stop
+                        </button>
                     </div>
 
                     <div className="flex flex-col gap-1">
