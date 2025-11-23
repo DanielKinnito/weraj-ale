@@ -2,22 +2,60 @@
 
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 
 interface AddRouteFormProps {
     onClose: () => void
+    onSuccess: () => void
 }
 
-export default function AddRouteForm({ onClose }: AddRouteFormProps) {
+export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) {
     const [loading, setLoading] = useState(false)
+    const { user } = useAuth()
+
+    const [formData, setFormData] = useState({
+        start_name: '',
+        end_name: '',
+        price: '',
+        vehicle_type: 'taxi',
+        // Default coords for Addis Ababa for now
+        start_lat: 9.0192,
+        start_lng: 38.7525,
+        end_lat: 9.0192,
+        end_lng: 38.7525,
+    })
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!user) return
+
         setLoading(true)
-        // TODO: Implement submission logic
-        setTimeout(() => {
+
+        try {
+            const { error } = await supabase.from('routes').insert({
+                user_id: user.id,
+                start_name: formData.start_name,
+                start_lat: formData.start_lat,
+                start_lng: formData.start_lng,
+                end_name: formData.end_name,
+                end_lat: formData.end_lat,
+                end_lng: formData.end_lng,
+                price: parseFloat(formData.price),
+                vehicle_type: formData.vehicle_type,
+                is_verified: false
+            })
+
+            if (error) throw error
+
+            alert('Route submitted successfully!')
+            onSuccess()
+        } catch (error) {
+            console.error('Error submitting route:', error)
+            alert('Failed to submit route. Please try again.')
+        } finally {
             setLoading(false)
-            onClose()
-        }, 1000)
+        }
     }
 
     return (
@@ -37,6 +75,8 @@ export default function AddRouteForm({ onClose }: AddRouteFormProps) {
                             type="text"
                             placeholder="e.g. Bole"
                             required
+                            value={formData.start_name}
+                            onChange={e => setFormData({ ...formData, start_name: e.target.value })}
                             className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                         />
                     </div>
@@ -47,6 +87,8 @@ export default function AddRouteForm({ onClose }: AddRouteFormProps) {
                             type="text"
                             placeholder="e.g. Piassa"
                             required
+                            value={formData.end_name}
+                            onChange={e => setFormData({ ...formData, end_name: e.target.value })}
                             className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                         />
                     </div>
@@ -57,13 +99,19 @@ export default function AddRouteForm({ onClose }: AddRouteFormProps) {
                             type="number"
                             placeholder="e.g. 15"
                             required
+                            value={formData.price}
+                            onChange={e => setFormData({ ...formData, price: e.target.value })}
                             className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                         />
                     </div>
 
                     <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Vehicle Type</label>
-                        <select className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                        <select
+                            value={formData.vehicle_type}
+                            onChange={e => setFormData({ ...formData, vehicle_type: e.target.value })}
+                            className="p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        >
                             <option value="taxi">Taxi (Minibus)</option>
                             <option value="bus">Bus (Anbessa)</option>
                             <option value="ride">Ride/Uber</option>
