@@ -52,7 +52,7 @@ export async function submitRoute(formData: any, stops: string[], userId: string
 
     if (error) {
         console.error('Error submitting route:', error)
-        return { success: false, message: 'Failed to save route.' }
+        return { success: false, message: `Failed to save route: ${error.message}` }
     }
 
     // 3. Submit Stops (if any)
