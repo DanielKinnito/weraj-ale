@@ -132,7 +132,7 @@ export default function Home() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-primary mb-1 flex items-center gap-2">
-              <BusFront size={28} />
+              <img src="/icon.png" alt="Weraj Ale Logo" width={70} height={70} className="flex-shrink-0" />
               Weraj Ale
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">Find and share public transport routes.</p>
