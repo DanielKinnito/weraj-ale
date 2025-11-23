@@ -12,6 +12,7 @@ export type Route = {
     description?: string
     is_verified: boolean
     created_at: string
+    updated_at?: string
 }
 
 export type Stop = {

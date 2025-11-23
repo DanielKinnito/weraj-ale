@@ -1,17 +1,40 @@
 'use client'
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import { useEffect, useState } from 'react'
 import { Route } from '@/lib/types'
 
-export default function MapInner({ routes = [] }: { routes?: Route[] }) {
+// Component to handle flying to a selected route
+function FlyToRoute({ selectedRoute }: { selectedRoute: Route | null }) {
+    const map = useMap()
+
+    useEffect(() => {
+        if (selectedRoute) {
+            map.flyTo([selectedRoute.start_lat, selectedRoute.start_lng], 15, {
+                duration: 1.5
+            })
+        }
+    }, [selectedRoute, map])
+
+    return null
+}
+
+// Component to invalidate map size on mount/resize to fix tile rendering
+function MapInvalidator() {
+    const map = useMap()
+    useEffect(() => {
+        map.invalidateSize()
+    }, [map])
+    return null
+}
+
+export default function MapInner({ routes = [], selectedRoute }: { routes?: Route[], selectedRoute?: Route | null }) {
     const [isMounted, setIsMounted] = useState(false)
 
     useEffect(() => {
         setIsMounted(true)
 
         // Fix for default marker icons in Next.js
-        // We need to import 'leaflet' dynamically to avoid SSR issues
         import('leaflet').then((L) => {
             // @ts-ignore
             delete L.Icon.Default.prototype._getIconUrl
@@ -32,6 +55,8 @@ export default function MapInner({ routes = [] }: { routes?: Route[] }) {
 
     return (
         <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%' }}>
+            <MapInvalidator />
+            <FlyToRoute selectedRoute={selectedRoute || null} />
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

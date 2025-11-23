@@ -1,32 +1,62 @@
 'use client'
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Loader2, Plus, Trash2 } from 'lucide-react'
+import { submitRoute, updateRoute } from '@/app/actions'
 import { useAuth } from '@/lib/auth'
-import { submitRoute } from '@/app/actions'
+import { Route } from '@/lib/types'
+import { supabase } from '@/lib/supabase'
 
 interface AddRouteFormProps {
     onClose: () => void
     onSuccess: () => void
+    initialData?: Route | null
 }
 
-export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) {
-    const [loading, setLoading] = useState(false)
+export default function AddRouteForm({ onClose, onSuccess, initialData }: AddRouteFormProps) {
     const { user } = useAuth()
-
+    const [loading, setLoading] = useState(false)
+    const [stops, setStops] = useState<string[]>([''])
     const [formData, setFormData] = useState({
         start_name: '',
         end_name: '',
         price: '',
         vehicle_type: 'taxi',
-        // Default coords for Addis Ababa for now
-        start_lat: 9.0192,
+        start_lat: 9.0192, // Default Addis Ababa
         start_lng: 38.7525,
         end_lat: 9.0192,
-        end_lng: 38.7525,
+        end_lng: 38.7525
     })
 
-    const [stops, setStops] = useState<string[]>([''])
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                start_name: initialData.start_name,
+                end_name: initialData.end_name,
+                price: initialData.price.toString(),
+                vehicle_type: initialData.vehicle_type,
+                start_lat: initialData.start_lat,
+                start_lng: initialData.start_lng,
+                end_lat: initialData.end_lat,
+                end_lng: initialData.end_lng
+            })
+            fetchStops(initialData.id)
+        }
+    }, [initialData])
+
+    const fetchStops = async (routeId: number) => {
+        const { data, error } = await supabase
+            .from('stops')
+            .select('name')
+            .eq('route_id', routeId)
+            .order('stop_order', { ascending: true })
+
+        if (data && data.length > 0) {
+            setStops(data.map(s => s.name))
+        } else {
+            setStops([''])
+        }
+    }
 
     const handleAddStop = () => {
         setStops([...stops, ''])
@@ -48,12 +78,15 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
         if (!user) return
 
         setLoading(true)
-
         try {
-            // Filter out empty stops
             const validStops = stops.filter(stop => stop.trim() !== '')
 
-            const result = await submitRoute(formData, validStops, user.id)
+            let result
+            if (initialData) {
+                result = await updateRoute(initialData.id, formData, validStops, user.id)
+            } else {
+                result = await submitRoute(formData, validStops, user.id)
+            }
 
             if (!result.success) {
                 throw new Error(result.message)
@@ -61,26 +94,26 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
 
             alert(result.message)
             onSuccess()
-        } catch (error) {
-            console.error('Error submitting route:', error)
-            const message = error instanceof Error ? error.message : 'Failed to submit route. Please try again.'
-            alert(message)
+        } catch (error: any) {
+            alert(error.message)
         } finally {
             setLoading(false)
         }
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] backdrop-blur-[4px]">
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl w-[90%] max-w-[500px] shadow-xl animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold">Add New Route</h2>
-                    <button onClick={onClose} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1200] p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                        {initialData ? 'Edit Route' : 'Add New Route'}
+                    </h2>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                         <X size={24} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
                     <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Start Location</label>
                         <input
@@ -169,7 +202,7 @@ export default function AddRouteForm({ onClose, onSuccess }: AddRouteFormProps) 
                         className="bg-primary hover:bg-primary-hover text-white p-3 rounded-md font-semibold mt-2 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
                         disabled={loading}
                     >
-                        {loading ? 'Submitting...' : 'Submit Route'}
+                        {loading ? (initialData ? 'Updating...' : 'Submitting...') : (initialData ? 'Update Route' : 'Submit Route')}
                     </button>
                 </form>
             </div>
