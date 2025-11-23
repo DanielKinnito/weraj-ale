@@ -1,15 +1,9 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-
-// Initialize Supabase client for server-side usage
-// Note: In a real app, use @supabase/ssr for better cookie handling
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { createClient } from '@/utils/supabase/server'
 
 export async function submitRoute(formData: any, stops: string[], userId: string) {
+    const supabase = await createClient()
     if (!userId) {
         return { success: false, message: 'User not authenticated' }
     }
