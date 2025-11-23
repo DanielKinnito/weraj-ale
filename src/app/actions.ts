@@ -170,19 +170,18 @@ export async function deleteRoute(routeId: number, userId: string) {
     // 2. Delete Route (Cascade will handle stops)
     // We use .select() to ensure we get back the deleted row. 
     // If no row is returned, it means nothing was deleted (maybe RLS or ID mismatch).
-    const { data: deletedRoute, error: deleteError } = await supabase
+    const { data: deletedRoutes, error: deleteError } = await supabase
         .from('routes')
         .delete()
         .eq('id', routeId)
         .select()
-        .single()
 
     if (deleteError) {
         console.error('Error deleting route:', deleteError)
         return { success: false, message: `Failed to delete route: ${deleteError.message} (Code: ${deleteError.code})` }
     }
 
-    if (!deletedRoute) {
+    if (!deletedRoutes || deletedRoutes.length === 0) {
         console.error('Delete operation returned no data')
         return { success: false, message: 'Failed to delete route. It may have already been deleted or you do not have permission.' }
     }

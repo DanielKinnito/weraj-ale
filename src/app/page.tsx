@@ -45,11 +45,26 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from('routes')
-        .select('*')
+        .select('*, reviews(rating)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setRoutes(data || [])
+
+      const routesWithRatings = data?.map((route: any) => {
+        const reviews = route.reviews || []
+        const rating_count = reviews.length
+        const avg_rating = rating_count > 0
+          ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / rating_count
+          : 0
+
+        return {
+          ...route,
+          avg_rating,
+          rating_count
+        }
+      })
+
+      setRoutes(routesWithRatings || [])
     } catch (error) {
       console.error('Error fetching routes:', error)
     } finally {
@@ -147,50 +162,50 @@ export default function Home() {
   return (
     <main className="flex h-screen w-screen relative overflow-hidden">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 z-[2000] flex items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <Menu className="w-6 h-6 text-slate-700 dark:text-slate-200" />
-          </button>
-          <div className="flex items-center gap-2">
-            <BusFront className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-              Weraj Ale
-            </h1>
-          </div>
-        </div>
+      {/* Logo Overlay */}
+      <div className="absolute top-4 left-4 z-[2000] flex items-center gap-2 pointer-events-none">
+        <img src="/icon.png" alt="Weraj Ale Logo" className="w-[70px] h-[70px] drop-shadow-md" />
+        <h1 className="text-2xl font-bold text-primary drop-shadow-md bg-white/80 dark:bg-slate-900/80 px-2 py-1 rounded-lg backdrop-blur-sm">
+          Weraj Ale
+        </h1>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            {isDarkMode ? <Sun className="w-5 h-5 text-slate-200" /> : <Moon className="w-5 h-5 text-slate-700" />}
-          </button>
-          {user ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium hidden md:block text-slate-700 dark:text-slate-200">
-                {user.email?.split('@')[0]}
-              </span>
-              <form action="/auth/signout" method="post">
-                <button className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors" title="Sign Out">
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </form>
-            </div>
-          ) : (
-            <form action="/auth/signin" method="post">
-              <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm">
-                <LogIn className="w-4 h-4" />
-                <span className="hidden md:inline">Sign In</span>
+      {/* Top Right Controls */}
+      <div className="absolute top-4 right-4 z-[2000] flex items-center gap-2">
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="p-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-md hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+        >
+          {isDarkMode ? <Sun className="w-5 h-5 text-slate-200" /> : <Moon className="w-5 h-5 text-slate-700" />}
+        </button>
+        {user ? (
+          <div className="flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-md rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+            <span className="text-sm font-medium hidden md:block text-slate-700 dark:text-slate-200 px-2">
+              {user.email?.split('@')[0]}
+            </span>
+            <form action="/auth/signout" method="post">
+              <button className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-red-500 transition-colors" title="Sign Out">
+                <LogOut className="w-4 h-4" />
               </button>
             </form>
-          )}
-        </div>
-      </header>
+          </div>
+        ) : (
+          <form action="/auth/signin" method="post">
+            <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shadow-md">
+              <LogIn className="w-4 h-4" />
+              <span className="hidden md:inline">Sign In</span>
+            </button>
+          </form>
+        )}
+      </div>
+
+      {/* Mobile Menu Button (Floating) */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="absolute top-24 left-4 z-[2000] p-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-md hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 md:hidden"
+      >
+        <Menu className="w-6 h-6 text-slate-700 dark:text-slate-200" />
+      </button>
 
       {/* Sidebar */}
       <div className={clsx(
