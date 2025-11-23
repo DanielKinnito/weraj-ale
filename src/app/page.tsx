@@ -12,7 +12,7 @@ import { Route } from '@/lib/types'
 
 export default function Home() {
   const [showAddRoute, setShowAddRoute] = useState(false)
-  const [reviewRouteId, setReviewRouteId] = useState<string | null>(null)
+  const [reviewRouteId, setReviewRouteId] = useState<number | null>(null)
   const { user, signInWithGoogle, signOut } = useAuth()
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +45,7 @@ export default function Home() {
     }
   }
 
-  const handleRateClick = (e: React.MouseEvent, routeId: string) => {
+  const handleRateClick = (e: React.MouseEvent, routeId: number) => {
     e.stopPropagation()
     if (!user) {
       signInWithGoogle()
@@ -139,7 +139,7 @@ export default function Home() {
 
       {/* Map Component */}
       <div className="absolute inset-0 w-full h-full z-0">
-        {/* <Map routes={routes} /> */}
+        <Map routes={routes} />
       </div>
 
       {/* Add Route Button */}
@@ -157,22 +157,22 @@ export default function Home() {
         <Plus size={24} />
       </button>
 
-      {/* {showAddRoute && (
-        <AddRouteForm 
-          onClose={() => setShowAddRoute(false)} 
+      {showAddRoute && (
+        <AddRouteForm
+          onClose={() => setShowAddRoute(false)}
           onSuccess={() => {
             fetchRoutes()
             setShowAddRoute(false)
           }}
         />
-      )} */}
+      )}
 
-      {/* {reviewRouteId && (
+      {reviewRouteId && (
         <ReviewForm
           routeId={reviewRouteId}
           onClose={() => setReviewRouteId(null)}
         />
-      )} */}
+      )}
     </main>
   )
 }

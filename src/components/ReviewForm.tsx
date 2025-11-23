@@ -5,7 +5,7 @@ import { X, Star } from 'lucide-react'
 import { submitReview } from '@/app/actions_review'
 
 interface ReviewFormProps {
-    routeId: string
+    routeId: number
     onClose: () => void
 }
 

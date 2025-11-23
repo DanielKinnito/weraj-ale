@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 
-export async function submitReview(routeId: string, rating: number, comment: string) {
+export async function submitReview(routeId: number, rating: number, comment: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 

@@ -1,30 +1,31 @@
 'use client'
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Route } from '@/lib/types'
 
-// Fix for default marker icons in Next.js
-const iconUrl = 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png'
-const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png'
-const shadowUrl = 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png'
-
 export default function MapInner({ routes = [] }: { routes?: Route[] }) {
+    const [isMounted, setIsMounted] = useState(false)
+
     useEffect(() => {
-        // Client-side only fix
-        if (typeof window !== 'undefined') {
-            const DefaultIcon = L.icon({
-                iconUrl,
-                iconRetinaUrl,
-                shadowUrl,
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
+        setIsMounted(true)
+
+        // Fix for default marker icons in Next.js
+        // We need to import 'leaflet' dynamically to avoid SSR issues
+        import('leaflet').then((L) => {
+            // @ts-ignore
+            delete L.Icon.Default.prototype._getIconUrl
+            L.Icon.Default.mergeOptions({
+                iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
+                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
             })
-            L.Marker.prototype.options.icon = DefaultIcon
-        }
+        })
     }, [])
+
+    if (!isMounted) {
+        return <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-900">Loading map...</div>
+    }
 
     // Addis Ababa coordinates
     const position: [number, number] = [9.0192, 38.7525]
