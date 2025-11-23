@@ -23,6 +23,10 @@ export default function Home() {
   const [editingRoute, setEditingRoute] = useState<Route | null>(null)
   const [activeTab, setActiveTab] = useState<'list' | 'add'>('list')
 
+  // Map Picking State
+  const [pickingField, setPickingField] = useState<'start' | 'end' | 'stop' | null>(null)
+  const [pickedLocation, setPickedLocation] = useState<{ field: 'start' | 'end' | 'stop', lat: number, lng: number, name: string } | null>(null)
+
   useEffect(() => {
     fetchRoutes()
     // Check system preference for dark mode
@@ -73,7 +77,8 @@ export default function Home() {
   const handleEditClick = (e: React.MouseEvent, route: Route) => {
     e.stopPropagation()
     setEditingRoute(route)
-    setShowAddRoute(true)
+    setActiveTab('add')
+    setIsSidebarOpen(true)
   }
 
   const handleDeleteClick = async (e: React.MouseEvent, routeId: number) => {
@@ -107,191 +112,203 @@ export default function Home() {
     }
   }
 
+  const handleMapClick = async (lat: number, lng: number) => {
+    if (!pickingField) return
+
+    // Reverse geocode
+    const { reverseGeocode } = await import('./actions')
+    const result = await reverseGeocode(lat, lng)
+    const name = result.success ? result.name : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+
+    setPickedLocation({ field: pickingField, lat, lng, name })
+    setPickingField(null) // Exit picking mode
+
+    // On mobile, open sidebar to show form again
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(true)
+    }
+  }
+
+  const handlePickLocation = (field: 'start' | 'end' | 'stop') => {
+    setPickingField(field)
+    // On mobile, close sidebar to show map
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }
+
+  const handleSuccess = () => {
+    fetchRoutes()
+    setActiveTab('list')
+    setEditingRoute(null)
+    setPickedLocation(null) // Clear picked location after success
+  }
+
   return (
     <main className="flex h-screen w-screen relative overflow-hidden">
-      {/* Sidebar Toggle Button (Mobile/Desktop) */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="absolute top-4 left-4 z-[1100] bg-white dark:bg-slate-800 p-2 rounded-md shadow-md md:hidden"
-      >
-        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
-
-      {/* Dark Mode Toggle */}
-      <button
-        onClick={toggleDarkMode}
-        className="absolute top-4 right-4 z-[1100] bg-white dark:bg-slate-800 p-2 rounded-full shadow-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-        title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
-
-      <div className={clsx(
-        "absolute top-0 left-0 h-full bg-white dark:bg-slate-900 shadow-lg z-[1000] flex flex-col transition-transform duration-300 ease-in-out w-full md:w-[400px]", // Increased width slightly
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-primary mb-1 flex items-center gap-2">
-              <img src="/icon.png" alt="Weraj Ale Logo" width={32} height={32} className="w-8 h-8" />
+      {/* Header */}
+      <header className="absolute top-0 left-0 right-0 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 z-[2000] flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <Menu className="w-6 h-6 text-slate-700 dark:text-slate-200" />
+          </button>
+          <div className="flex items-center gap-2">
+            <BusFront className="w-6 h-6 text-primary" />
+            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
               Weraj Ale
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Find and share public transport routes.</p>
           </div>
-
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="md:hidden text-slate-500"
-          >
-            <X size={24} />
-          </button>
         </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            {isDarkMode ? <Sun className="w-5 h-5 text-slate-200" /> : <Moon className="w-5 h-5 text-slate-700" />}
+          </button>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium hidden md:block text-slate-700 dark:text-slate-200">
+                {user.email?.split('@')[0]}
+              </span>
+              <form action="/auth/signout" method="post">
+                <button className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-colors" title="Sign Out">
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
+          ) : (
+            <form action="/auth/signin" method="post">
+              <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm">
+                <LogIn className="w-4 h-4" />
+                <span className="hidden md:inline">Sign In</span>
+              </button>
+            </form>
+          )}
+        </div>
+      </header>
+
+      {/* Sidebar */}
+      <div className={clsx(
+        "absolute top-0 left-0 h-full bg-white dark:bg-slate-900 shadow-lg z-[1000] flex flex-col transition-transform duration-300 ease-in-out w-full md:w-[350px] pt-16",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800">
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
           <button
-            onClick={() => {
-              setActiveTab('list')
-              setEditingRoute(null)
-            }}
-            className={clsx(
-              "flex-1 p-3 text-sm font-medium transition-colors relative",
-              activeTab === 'list'
-                ? "text-primary"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            )}
+            className={clsx("flex-1 p-3 text-sm font-medium transition-colors", activeTab === 'list' ? "text-primary border-b-2 border-primary" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200")}
+            onClick={() => setActiveTab('list')}
           >
             Routes
-            {activeTab === 'list' && (
-              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary" />
-            )}
           </button>
           <button
-            onClick={() => setActiveTab('add')}
-            className={clsx(
-              "flex-1 p-3 text-sm font-medium transition-colors relative",
-              activeTab === 'add'
-                ? "text-primary"
-                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            )}
+            className={clsx("flex-1 p-3 text-sm font-medium transition-colors", activeTab === 'add' ? "text-primary border-b-2 border-primary" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200")}
+            onClick={() => {
+              setActiveTab('add')
+              setEditingRoute(null)
+            }}
           >
-            {editingRoute ? 'Edit Route' : 'Add Route'}
-            {activeTab === 'add' && (
-              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary" />
-            )}
+            Add Route
           </button>
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-y-auto relative">
           {/* List Tab */}
           <div className={clsx(
-            "absolute inset-0 overflow-y-auto p-4 space-y-3 transition-opacity duration-300",
+            "absolute inset-0 overflow-y-auto p-4 transition-opacity duration-300",
             activeTab === 'list' ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
           )}>
-            {/* User Auth Section (Only visible in List tab or always? Let's keep it in List for now or move to top) */}
-            {/* Actually, user auth is better at the top or in a settings menu, but let's keep it here for now */}
-            <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              {user ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                      {user.user_metadata.avatar_url ? (
-                        <img src={user.user_metadata.avatar_url} alt="User" className="w-full h-full object-cover" />
-                      ) : (
-                        <UserIcon size={16} className="text-slate-500" />
-                      )}
-                    </div>
-                    <span className="text-sm font-medium truncate max-w-[150px]">{user.email}</span>
-                  </div>
-                  <button onClick={signOut} className="text-slate-400 hover:text-red-500 transition-colors" title="Sign Out">
-                    <LogOut size={18} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={signInWithGoogle}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover p-2 rounded-md transition-colors"
-                >
-                  <LogIn size={18} />
-                  Sign in with Google
-                </button>
-              )}
-            </div>
-
             {loading ? (
-              <p className="text-center text-slate-500">Loading routes...</p>
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
             ) : routes.length === 0 ? (
-              <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg text-center">
-                <p className="text-sm text-slate-500 dark:text-slate-400">No routes found. Be the first to add one!</p>
+              <div className="text-center py-8 text-slate-500">
+                No routes found. Be the first to add one!
               </div>
             ) : (
-              routes.map(route => (
-                <div
-                  key={route.id}
-                  onClick={() => handleRouteClick(route)}
-                  className={clsx(
-                    "p-3 border rounded-lg transition-all cursor-pointer shadow-sm group relative",
-                    selectedRoute?.id === route.id
-                      ? "border-primary bg-primary/5 dark:bg-primary/10"
-                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/50"
-                  )}
-                >
-                  {/* ... (Route Card Content - Same as before) ... */}
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      {getVehicleIcon(route.vehicle_type)}
-                      <span className="capitalize">{route.vehicle_type}</span>
+              <div className="space-y-4">
+                {routes.map(route => (
+                  <div
+                    key={route.id}
+                    onClick={() => handleRouteClick(route)}
+                    className={clsx(
+                      "bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all cursor-pointer hover:shadow-md",
+                      selectedRoute?.id === route.id ? "border-primary ring-1 ring-primary" : "border-slate-200 dark:border-slate-700 hover:border-primary/50"
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300">
+                          {getVehicleIcon(route.vehicle_type)}
+                        </div>
+                        <span className="font-semibold text-slate-800 dark:text-white capitalize">
+                          {route.vehicle_type}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-primary">{route.price} ETB</span>
+                        {user && user.id === route.user_id && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={(e) => handleEditClick(e, route)}
+                              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-blue-500 transition-colors"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(e, route.id)}
+                              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {user && user.id === route.user_id && (
-                        <>
-                          <button
-                            onClick={(e) => handleEditClick(e, route)}
-                            className="text-slate-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
-                            title="Edit this route"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteClick(e, route.id)}
-                            className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
-                            title="Delete this route"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
+
+                    <div className="flex flex-col gap-1 relative pl-4 border-l-2 border-slate-200 dark:border-slate-700 ml-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500" />
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{route.start_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="absolute -left-[5px] bottom-1 w-2 h-2 rounded-full bg-red-500" />
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{route.end_name}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                          {route.avg_rating ? route.avg_rating.toFixed(1) : 'New'}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          ({route.rating_count || 0})
+                        </span>
+                      </div>
                       <button
                         onClick={(e) => handleRateClick(e, route.id)}
-                        className="text-slate-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all"
-                        title="Rate this route"
+                        className="text-xs font-medium text-primary hover:underline"
                       >
-                        <Star size={16} />
+                        Rate
                       </button>
-                      <span className="text-sm font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-700 dark:text-slate-300">
-                        {route.price} ETB
-                      </span>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col gap-1 relative pl-4 border-l-2 border-slate-200 dark:border-slate-700 ml-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500" />
-                      <span className="font-medium">{route.start_name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="absolute -left-[5px] bottom-1 w-2 h-2 rounded-full bg-red-500" />
-                      <span className="font-medium">{route.end_name}</span>
-                    </div>
                     {route.updated_at && (
-                      <div className="text-xs text-slate-400 mt-1 italic">
-                        Edited {new Date(route.updated_at).toLocaleDateString()}
+                      <div className="text-xs text-slate-400 mt-2 italic border-t border-slate-100 dark:border-slate-700 pt-2">
+                        Updated {new Date(route.updated_at).toLocaleDateString()}
                       </div>
                     )}
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
 
@@ -305,13 +322,11 @@ export default function Home() {
                 setActiveTab('list')
                 setEditingRoute(null)
               }}
-              onSuccess={() => {
-                fetchRoutes()
-                setActiveTab('list')
-                setEditingRoute(null)
-              }}
+              onSuccess={handleSuccess}
               initialData={editingRoute}
               isEmbedded={true}
+              onPickLocation={handlePickLocation}
+              pickedLocation={pickedLocation}
             />
           </div>
         </div>
@@ -328,9 +343,14 @@ export default function Home() {
       {/* Map Component */}
       <div className={clsx(
         "absolute inset-0 w-full h-full z-0 transition-all duration-300",
-        isSidebarOpen ? "md:pl-[400px]" : "pl-0"
+        isSidebarOpen ? "md:pl-[350px]" : "pl-0"
       )}>
-        <Map routes={routes} selectedRoute={selectedRoute} />
+        <Map
+          routes={routes}
+          selectedRoute={selectedRoute}
+          onMapClick={handleMapClick}
+          pickingMode={!!pickingField}
+        />
       </div>
 
       {/* Add Route Button (Floating Action Button) - Only show if NOT in add tab */}

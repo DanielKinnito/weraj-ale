@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 
 const Map = dynamic(() => import('./MapInner'), {
     ssr: false,
-    loading: () => <div style={{ height: '100%', width: '100%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Map...</div>
+    loading: () => <div className="w-full h-full bg-slate-100 dark:bg-slate-800 animate-pulse" />
 })
 
 export default Map

@@ -10,13 +10,15 @@ import LocationSearch from './LocationSearch'
 import clsx from 'clsx'
 
 interface AddRouteFormProps {
-    onClose: () => void
+    onClose?: () => void
     onSuccess: () => void
     initialData?: Route | null
     isEmbedded?: boolean
+    onPickLocation?: (field: 'start' | 'end' | 'stop', index?: number) => void
+    pickedLocation?: { field: 'start' | 'end' | 'stop', lat: number, lng: number, name: string } | null
 }
 
-export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedded = false }: AddRouteFormProps) {
+export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedded = false, onPickLocation, pickedLocation }: AddRouteFormProps) {
     const { user } = useAuth()
     const [loading, setLoading] = useState(false)
 
@@ -63,6 +65,21 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
         }
     }, [initialData])
 
+    useEffect(() => {
+        if (pickedLocation) {
+            if (pickedLocation.field === 'start') {
+                setFormData(prev => ({ ...prev, start_name: pickedLocation.name, start_lat: pickedLocation.lat, start_lng: pickedLocation.lng }))
+            } else if (pickedLocation.field === 'end') {
+                setFormData(prev => ({ ...prev, end_name: pickedLocation.name, end_lat: pickedLocation.lat, end_lng: pickedLocation.lng }))
+            } else if (pickedLocation.field === 'stop') {
+                // We need to know which stop index. 
+                // For now, let's assume we handle stop picking differently or pass index in pickedLocation if needed.
+                // But the current implementation of pickedLocation doesn't have index.
+                // Let's skip stop picking from map for now or handle it later if requested.
+            }
+        }
+    }, [pickedLocation])
+
     const fetchStops = async (routeId: number) => {
         const { data, error } = await supabase
             .from('stops')
@@ -98,30 +115,13 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
 
         setLoading(true)
         try {
-            // Pass stops as objects now, but the server action expects string[] for names
-            // We need to update the server action to accept coordinates for stops too!
-            // For now, we'll pass the names, but we should update the action to handle coords.
-            // Wait, I can't easily change the server action signature without breaking things?
-            // Actually, I should update the server action to accept full stop objects.
-            // But for now, let's just pass names to `submitRoute` and `updateRoute` 
-            // AND we need to pass the coordinates for start/end which are in formData.
-
-            // NOTE: The current `submitRoute` and `updateRoute` actions take `stops: string[]`.
-            // They insert stops with `lat: 0, lng: 0`.
-            // I need to update `actions.ts` to accept `stops: {name: string, lat: number, lng: number}[]`.
-
-            // Let's assume I will update actions.ts next.
-
             const validStops = stops.filter(stop => stop.name.trim() !== '')
-
-            // We'll pass the full stop objects to a modified action (I'll update actions.ts next)
-            // For now, I'll pass them as `any` to bypass TS check if I haven't updated types yet
 
             let result
             if (initialData) {
-                result = await updateRoute(initialData.id, formData, validStops as any, user.id)
+                result = await updateRoute(initialData.id, formData, validStops, user.id)
             } else {
-                result = await submitRoute(formData, validStops as any, user.id)
+                result = await submitRoute(formData, validStops, user.id)
             }
 
             if (!result.success) {
@@ -130,8 +130,12 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
 
             alert(result.message)
             onSuccess()
-        } catch (error: any) {
-            alert(error.message)
+        } catch (error) {
+            if (error instanceof Error) {
+                alert(error.message)
+            } else {
+                alert('An unexpected error occurred')
+            }
         } finally {
             setLoading(false)
         }
@@ -162,6 +166,7 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
                             start_lat: loc.lat,
                             start_lng: loc.lng
                         })}
+                        onPickFromMap={() => onPickLocation?.('start')}
                     />
                 </div>
 
@@ -207,6 +212,7 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
                             end_lat: loc.lat,
                             end_lng: loc.lng
                         })}
+                        onPickFromMap={() => onPickLocation?.('end')}
                     />
                 </div>
 
@@ -227,7 +233,7 @@ export default function AddRouteForm({ onClose, onSuccess, initialData, isEmbedd
                     <select
                         value={formData.vehicle_type}
                         onChange={e => setFormData({ ...formData, vehicle_type: e.target.value })}
-                        className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
                     >
                         <option value="taxi">Taxi (Minibus)</option>
                         <option value="bus">Bus (Anbessa)</option>

@@ -168,14 +168,23 @@ export async function deleteRoute(routeId: number, userId: string) {
     }
 
     // 2. Delete Route (Cascade will handle stops)
-    const { error: deleteError } = await supabase
+    // We use .select() to ensure we get back the deleted row. 
+    // If no row is returned, it means nothing was deleted (maybe RLS or ID mismatch).
+    const { data: deletedRoute, error: deleteError } = await supabase
         .from('routes')
         .delete()
         .eq('id', routeId)
+        .select()
+        .single()
 
     if (deleteError) {
         console.error('Error deleting route:', deleteError)
         return { success: false, message: `Failed to delete route: ${deleteError.message} (Code: ${deleteError.code})` }
+    }
+
+    if (!deletedRoute) {
+        console.error('Delete operation returned no data')
+        return { success: false, message: 'Failed to delete route. It may have already been deleted or you do not have permission.' }
     }
 
     return { success: true, message: 'Route deleted successfully!' }
@@ -202,5 +211,31 @@ export async function searchLocation(query: string) {
     } catch (error: any) {
         console.error('Error searching location:', error)
         return { success: false, message: 'Failed to search location' }
+    }
+}
+
+export async function reverseGeocode(lat: number, lng: number) {
+    const apiKey = process.env.ORS_API_KEY
+    if (!apiKey) {
+        return { success: false, message: 'Server configuration error' }
+    }
+
+    try {
+        const response = await fetch(
+            `https://api.openrouteservice.org/geocode/reverse?api_key=${apiKey}&point.lat=${lat}&point.lon=${lng}&size=1`
+        )
+
+        if (!response.ok) {
+            throw new Error(`ORS API Error: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        if (data.features && data.features.length > 0) {
+            return { success: true, name: data.features[0].properties.name || data.features[0].properties.label }
+        }
+        return { success: false, message: 'No address found' }
+    } catch (error: any) {
+        console.error('Error reverse geocoding:', error)
+        return { success: false, message: 'Failed to resolve location' }
     }
 }

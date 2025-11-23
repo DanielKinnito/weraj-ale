@@ -1,26 +1,30 @@
 'use client'
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Route } from '@/lib/types'
-import { useEffect, useState } from 'react'
 import RoutePolyline from './RoutePolyline'
 
-// Fix for default marker icons in Next.js
-const iconRetinaUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png'
-const iconUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png'
-const shadowUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
-
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl,
-    iconUrl,
-    shadowUrl,
+// Fix Leaflet default icon issue
+const DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
 })
+
+L.Marker.prototype.options.icon = DefaultIcon
 
 interface MapInnerProps {
     routes: Route[]
     selectedRoute?: Route | null
+    onMapClick?: (lat: number, lng: number) => void
+    pickingMode?: boolean
 }
 
 function MapInvalidator() {
@@ -46,12 +50,26 @@ function FlyToRoute({ selectedRoute }: { selectedRoute: Route | null }) {
     return null
 }
 
-export default function MapInner({ routes, selectedRoute }: MapInnerProps) {
+function MapEvents({ onMapClick }: { onMapClick?: (lat: number, lng: number) => void }) {
+    useMapEvents({
+        click(e) {
+            onMapClick?.(e.latlng.lat, e.latlng.lng)
+        },
+    })
+    return null
+}
+
+export default function MapInner({ routes, selectedRoute, onMapClick, pickingMode = false }: MapInnerProps) {
     const position: [number, number] = [9.0192, 38.7525] // Addis Ababa
 
     return (
-        <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%' }}>
+        <MapContainer
+            center={position}
+            zoom={13}
+            style={{ height: '100%', width: '100%', cursor: pickingMode ? 'crosshair' : 'grab' }}
+        >
             <MapInvalidator />
+            <MapEvents onMapClick={onMapClick} />
             <FlyToRoute selectedRoute={selectedRoute || null} />
             {selectedRoute && <RoutePolyline route={selectedRoute} />}
 

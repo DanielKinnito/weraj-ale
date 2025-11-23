@@ -1,5 +1,7 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
-import { Search, MapPin, Loader2 } from 'lucide-react'
+import { Search, MapPin, Loader2, Map } from 'lucide-react'
 import clsx from 'clsx'
 import { searchLocation } from '@/app/actions'
 
@@ -14,9 +16,10 @@ interface LocationSearchProps {
     onSelect: (location: Location) => void
     defaultValue?: string
     className?: string
+    onPickFromMap?: () => void
 }
 
-export default function LocationSearch({ placeholder, onSelect, defaultValue = '', className }: LocationSearchProps) {
+export default function LocationSearch({ placeholder, onSelect, defaultValue = '', className, onPickFromMap }: LocationSearchProps) {
     const [query, setQuery] = useState(defaultValue)
     const [results, setResults] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
@@ -75,23 +78,37 @@ export default function LocationSearch({ placeholder, onSelect, defaultValue = '
     }
 
     return (
-        <div ref={wrapperRef} className={clsx("relative", className)}>
-            <div className="relative">
-                <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full p-3 pl-10 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                {loading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-primary animate-spin" size={18} />
+        <div className={clsx("relative", className)} ref={wrapperRef}>
+            <div className="relative flex gap-2">
+                <div className="relative flex-1">
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        placeholder={placeholder}
+                        className="w-full p-3 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                    />
+                    <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                    {loading && (
+                        <div className="absolute right-3 top-3.5">
+                            <Loader2 className="animate-spin text-primary" size={18} />
+                        </div>
+                    )}
+                </div>
+                {onPickFromMap && (
+                    <button
+                        type="button"
+                        onClick={onPickFromMap}
+                        className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        title="Pick on Map"
+                    >
+                        <Map size={20} />
+                    </button>
                 )}
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-100 dark:border-slate-700 max-h-60 overflow-y-auto">
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto">
                     {results.map((feature, index) => (
                         <button
                             key={index}
